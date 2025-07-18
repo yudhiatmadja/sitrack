@@ -159,12 +159,19 @@ export default async function LandOwnersPage({
                     <p className="mt-2 text-sm text-gray-700">Kelola semua data pemilik lahan yang bekerja sama.</p>
                 </div>
                 <div className="mt-4 sm:ml-16 sm:mt-0 sm:flex-none">
-                    {canCreate && (
-                        <Link href="/dashboard/land-owners/new" className="inline-flex items-center gap-x-2 rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500">
-                            <PlusCircle size={20} />
-                            Tambah Pemilik Lahan
-                        </Link>
-                    )}
+                    <div className="mt-4 sm:mt-0 sm:ml-6 flex gap-3">
+    {canCreate && (
+        <Link
+            href="/dashboard/land-owners/new"
+            className="inline-flex items-center gap-x-2 rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500"
+        >
+            <PlusCircle size={20} />
+            Tambah Pemilik Lahan
+        </Link>
+    )}
+    <ExportSection searchQuery={searchQuery} />
+</div>
+
                 </div>
             </div>
             
@@ -173,9 +180,7 @@ export default async function LandOwnersPage({
                 <div className="w-full max-w-md">
                     <Search placeholder="Cari pemilik lahan..." />
                 </div>
-                <div className="ml-4">
-                    <ExportSection searchQuery={searchQuery} />
-                </div>
+              
             </div>
             
             <LandOwnersTable searchQuery={searchQuery} />

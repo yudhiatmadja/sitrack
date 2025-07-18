@@ -98,8 +98,8 @@ export default async function SitesPage({
         </div>
 
         {/* Komponen Search */}
-        <div className="mb-6">
-          <Search placeholder="Cari berdasarkan nama atau ID site..." />
+        <div className="mb-6 w-full max-w-md">
+          <Search placeholder="Cari berdasarkan nama site..." />
         </div>
 
         {/* Tampilan Data atau Empty State */}

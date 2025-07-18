@@ -2,7 +2,7 @@
 'use client'
 
 import { useState } from 'react';
-import { Download, FileText, FileSpreadsheet, FileImage, File } from 'lucide-react';
+import { Download, FileText, FileSpreadsheet, FileImage, File, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
@@ -201,63 +201,75 @@ const exportToPDF = (options: ExportOptions) => {
   doc.save(`${filename}.pdf`);
 };
 
-// const exportToWord = (options: ExportOptions) => {
-//   const { filename, data, columns, title } = options;
+// Fixed Word export function to create proper .docx file
+const exportToWord = (options: ExportOptions) => {
+  const { filename, data, columns, title } = options;
   
-//   let rtfContent = '{\\rtf1\\ansi\\deff0 {\\fonttbl {\\f0 Times New Roman;}}';
+  // Create HTML content for Word
+  let htmlContent = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        h1 { color: #333; margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; font-weight: bold; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+      </style>
+    </head>
+    <body>
+  `;
   
-//   if (title) {
-//     rtfContent += `\\f0\\fs28\\b ${title}\\b0\\fs20\\par\\par`;
-//   }
+  if (title) {
+    htmlContent += `<h1>${title}</h1>`;
+  }
   
-//   rtfContent += '\\trowd\\trgaph108\\trleft-108';
+  htmlContent += '<table>';
   
-//   let cellX = 0;
-//   columns.forEach((col, index) => {
-//     cellX += (col.width || 20) * 50;
-//     rtfContent += `\\cellx${cellX}`;
-//   });
+  // Add headers
+  htmlContent += '<thead><tr>';
+  columns.forEach(col => {
+    htmlContent += `<th>${col.header}</th>`;
+  });
+  htmlContent += '</tr></thead>';
   
-//   rtfContent += '\\intbl\\b ';
-//   columns.forEach((col, index) => {
-//     rtfContent += `${col.header}\\cell`;
-//   });
-//   rtfContent += '\\b0\\row';
-  
-//   data.forEach(row => {
-//     rtfContent += '\\trowd\\trgaph108\\trleft-108';
-//     cellX = 0;
-//     columns.forEach((col, index) => {
-//       cellX += (col.width || 20) * 50;
-//       rtfContent += `\\cellx${cellX}`;
-//     });
-//     rtfContent += '\\intbl ';
-    
-//     columns.forEach(col => {
-//       // Handle nested object properties (e.g., sites.name)
-//       const value = col.key.includes('.') 
-//         ? col.key.split('.').reduce((obj, key) => obj?.[key], row)
-//         : row[col.key];
+  // Add data rows
+  htmlContent += '<tbody>';
+  data.forEach(row => {
+    htmlContent += '<tr>';
+    columns.forEach(col => {
+      // Handle nested object properties (e.g., sites.name)
+      const value = col.key.includes('.') 
+        ? col.key.split('.').reduce((obj, key) => obj?.[key], row)
+        : row[col.key];
       
-//       const cellValue = formatValue(value, col.render);
-//       rtfContent += `${cellValue || ''}\\cell`;
-//     });
-//     rtfContent += '\\row';
-//   });
+      const cellValue = formatValue(value, col.render);
+      htmlContent += `<td>${cellValue || ''}</td>`;
+    });
+    htmlContent += '</tr>';
+  });
+  htmlContent += '</tbody>';
   
-//   rtfContent += '}';
+  htmlContent += '</table></body></html>';
   
-//   const blob = new Blob([rtfContent], { type: 'application/rtf' });
-//   const link = document.createElement('a');
-//   const url = URL.createObjectURL(blob);
+  // Create blob with proper MIME type for Word
+  const blob = new Blob([htmlContent], { 
+    type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
+  });
   
-//   link.setAttribute('href', url);
-//   link.setAttribute('download', `${filename}.docx`);
-//   link.style.visibility = 'hidden';
-//   document.body.appendChild(link);
-//   link.click();
-//   document.body.removeChild(link);
-// };
+  const link = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+  
+  link.setAttribute('href', url);
+  link.setAttribute('download', `${filename}.docx`);
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
 
 // Main Export Button Component
 export function ExportButton({ 
@@ -296,10 +308,10 @@ export function ExportButton({
           exportToPDF(options);
           toast.success('File PDF berhasil diunduh');
           break;
-        // case 'word':
-        //   exportToWord(options);
-        //   toast.success('File Word berhasil diunduh');
-        //   break;
+        case 'word':
+          exportToWord(options);
+          toast.success('File Word berhasil diunduh');
+          break;
       }
     } catch (error) {
       console.error('Export error:', error);
@@ -315,10 +327,11 @@ export function ExportButton({
       <button
         onClick={() => setIsOpen(!isOpen)}
         disabled={isExporting || data.length === 0}
-        className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="inline-flex items-center px-4 py-2 border border-red-600 shadow-sm text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
       >
         <Download className="h-4 w-4 mr-2" />
         {isExporting ? 'Exporting...' : 'Export'}
+        <ChevronDown className="h-4 w-4 ml-2" />
       </button>
 
       {isOpen && (
@@ -326,7 +339,7 @@ export function ExportButton({
           <div className="py-1">
             <button
               onClick={() => handleExport('excel')}
-              className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+              className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors duration-150"
             >
               <FileSpreadsheet className="h-4 w-4 mr-2 text-green-600" />
               Export to Excel
@@ -334,7 +347,7 @@ export function ExportButton({
             
             <button
               onClick={() => handleExport('csv')}
-              className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+              className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors duration-150"
             >
               <FileText className="h-4 w-4 mr-2 text-blue-600" />
               Export to CSV
@@ -342,19 +355,19 @@ export function ExportButton({
             
             <button
               onClick={() => handleExport('pdf')}
-              className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+              className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors duration-150"
             >
               <FileImage className="h-4 w-4 mr-2 text-red-600" />
               Export to PDF
             </button>
             
-            {/* <button
+            <button
               onClick={() => handleExport('word')}
-              className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+              className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors duration-150"
             >
               <File className="h-4 w-4 mr-2 text-blue-800" />
               Export to Word
-            </button> */}
+            </button>
           </div>
         </div>
       )}
