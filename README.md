@@ -353,13 +353,7 @@ npm run type-check
         <br />
         <strong>Tailwind CSS</strong>
       </td>
-      <td align="center">
-        <a href="https://www.framer.com/motion/">
-          <img src="https://www.framer.com/favicon.ico" width="50" height="50" alt="Framer Motion" />
-        </a>
-        <br />
-        <strong>Framer Motion</strong>
-      </td>
+      
     </tr>
   </table>
 </div>
