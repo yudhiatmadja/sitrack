@@ -7,6 +7,21 @@ import { SitesTable } from "./SitesTable";
 import { type Database } from "@/types/supabase";
 import { getCurrentUserRole } from "@/lib/auth-helper";
 import { Search } from "@/components/ui/Search";
+import { ExportButton, type ExportColumn } from "@/components/ui/ExportButton";
+
+// Define the columns for sites export
+const sitesColumns: ExportColumn[] = [
+  { header: 'ID', key: 'id', width: 15 },
+  { header: 'Nama Site', key: 'name', width: 25 },
+  { header: 'Alamat', key: 'address', width: 40 },
+  { header: 'Kota', key: 'city', width: 20 },
+  { header: 'Provinsi', key: 'province', width: 20 },
+  { header: 'Kode Pos', key: 'postal_code', width: 15 },
+  { header: 'Latitude', key: 'latitude', width: 15 },
+  { header: 'Longitude', key: 'longitude', width: 15 },
+  { header: 'Tanggal Dibuat', key: 'created_at', width: 20, render: 'datetime' },
+  { header: 'Tanggal Diupdate', key: 'updated_at', width: 20, render: 'datetime' },
+];
 
 export default async function SitesPage({
   searchParams,
@@ -62,16 +77,23 @@ export default async function SitesPage({
               Daftar semua lokasi site yang terdaftar dalam sistem.
             </p>
           </div>
-          <div className="mt-4 sm:ml-16 sm:mt-0 sm:flex-none">
+          <div className="mt-4 sm:ml-16 sm:mt-0 sm:flex-none flex items-center gap-3">
             {canCreate && (
               <Link
                 href="/dashboard/sites/new"
-                className="inline-flex items-center gap-x-2 rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500" // Gunakan class helper jika ada
+                className="inline-flex items-center gap-x-2 rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500"
               >
                 <PlusCircle size={20} className="mr-2" />
                 Tambah Site Baru
               </Link>
             )}
+            <ExportButton
+              data={sites || []} // Use sites data instead of contracts
+              columns={sitesColumns} // Use sitesColumns instead of contractColumns
+              filename="data-sites"
+              title="Data Sites"
+              sheetName="Sites"
+            />
           </div>
         </div>
 
