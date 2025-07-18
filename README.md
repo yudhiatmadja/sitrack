@@ -460,7 +460,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 </div>
 
 <div align="center">
-  <p>Made with ❤️ by <a href="https://github.com/yudhiiatmadja">Your Name</a></p>
+  <p>Made with ❤️ by <a href="https://github.com/yudhiiatmadja">Yudhi Atmadja</a></p>
   <p>⭐ Don't forget to star this repository if you found it helpful!</p>
 </div>
 
