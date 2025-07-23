@@ -121,43 +121,125 @@ export async function createUser(prevState: UserState, formData: FormData): Prom
   throw redirect('/dashboard/users');
 }
 
-
-// ACTION: DELETE USER (MENGGUNAKAN RPC 'force_delete_user')
+// ENHANCED DELETE USER FUNCTION - Metode yang lebih robust
 export async function deleteUser(userId: string) {
-    'use server'
+  'use server'
 
-    if (!userId) {
-        throw new Error("User ID tidak disediakan untuk dihapus.");
-    }
-    
-    // Gunakan Supabase Admin Client karena memanggil RPC yang sensitif
-    // adalah operasi administratif.
-    const supabaseAdmin = createAdminClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
-    
-    // Panggil fungsi RPC yang telah kita buat di database
-    const { data, error } = await supabaseAdmin.rpc('force_delete_user', {
-        p_user_id: userId // Nama parameter harus sama dengan di fungsi SQL (p_user_id)
+  if (!userId) {
+    throw new Error("User ID tidak disediakan untuk dihapus.");
+  }
+
+  console.log(`[deleteUser] Memulai penghapusan user: ${userId}`);
+
+  const supabaseAdmin = createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
+  try {
+    // Metode 1: Gunakan RPC function (jika sudah dibuat)
+    const { data: rpcData, error: rpcError } = await supabaseAdmin.rpc('force_delete_user', {
+      p_user_id: userId
     });
 
-    if (error) {
-        // Jika RPC function itu sendiri error
-        console.error("RPC Error:", error);
-        throw new Error(`Gagal menjalankan force_delete_user: ${error.message}`);
+    if (rpcError) {
+      console.warn(`[deleteUser] RPC gagal: ${rpcError.message}. Mencoba metode manual...`);
+      
+      // Metode 2: Manual deletion jika RPC gagal
+      await manualDeleteUser(supabaseAdmin, userId);
+    } else {
+      console.log(`[deleteUser] RPC berhasil: ${rpcData}`);
+      
+      // Pastikan juga hapus dari Auth (double check)
+      const { error: authDeleteError } = await supabaseAdmin.auth.admin.deleteUser(userId);
+      if (authDeleteError && !authDeleteError.message.includes('User not found')) {
+        console.warn(`[deleteUser] Peringatan Auth delete: ${authDeleteError.message}`);
+      }
     }
 
-    // `data` akan berisi string "User ... cleared." atau "Failed to delete..."
-    console.log("Hasil dari force_delete_user:", data);
-
-    // Jika pesan dari RPC mengandung kata "Failed", kita lempar error
-    if (data && data.includes('Failed')) {
-        throw new Error(data);
-    }
+  } catch (error: any) {
+    console.error(`[deleteUser] Error dalam RPC: ${error.message}`);
     
-    // Revalidate path untuk memperbarui UI
-    revalidatePath('/dashboard/users');
+    // Fallback ke manual deletion
+    try {
+      await manualDeleteUser(supabaseAdmin, userId);
+    } catch (manualError: any) {
+      throw new Error(`Gagal menghapus user: ${manualError.message}`);
+    }
+  }
+
+  console.log(`[deleteUser] User ${userId} berhasil dihapus`);
+  revalidatePath('/dashboard/users');
+}
+
+// Helper function untuk manual deletion
+async function manualDeleteUser(supabaseAdmin: any, userId: string) {
+  console.log(`[manualDeleteUser] Memulai penghapusan manual untuk user: ${userId}`);
+
+  // 1. Hapus dari tabel users (profile data)
+  const { error: profileDeleteError } = await supabaseAdmin
+    .from('users')
+    .delete()
+    .eq('id', userId);
+
+  if (profileDeleteError) {
+    console.error(`[manualDeleteUser] Gagal hapus profil: ${profileDeleteError.message}`);
+    throw new Error(`Gagal menghapus profil: ${profileDeleteError.message}`);
+  }
+
+  // 2. Hapus dari Auth
+  const { error: authDeleteError } = await supabaseAdmin.auth.admin.deleteUser(userId);
+  
+  if (authDeleteError) {
+    // Jika user sudah tidak ada di Auth, itu bukan masalah besar
+    if (authDeleteError.message.includes('User not found')) {
+      console.warn(`[manualDeleteUser] User tidak ditemukan di Auth (mungkin sudah dihapus): ${userId}`);
+    } else {
+      console.error(`[manualDeleteUser] Gagal hapus dari Auth: ${authDeleteError.message}`);
+      throw new Error(`Gagal menghapus dari Auth: ${authDeleteError.message}`);
+    }
+  }
+
+  console.log(`[manualDeleteUser] User ${userId} berhasil dihapus secara manual`);
+}
+
+// ALTERNATIVE: Soft Delete function (jika Anda ingin soft delete)
+export async function softDeleteUser(userId: string) {
+  'use server'
+
+  if (!userId) {
+    throw new Error("User ID tidak disediakan untuk dihapus.");
+  }
+
+  const supabaseAdmin = createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
+  // Update user dengan flag deleted_at atau is_deleted
+  const { error } = await supabaseAdmin
+    .from('users')
+    .update({ 
+      deleted_at: new Date().toISOString(),
+      // atau jika menggunakan boolean: is_deleted: true
+    })
+    .eq('id', userId);
+
+  if (error) {
+    throw new Error(`Gagal melakukan soft delete: ${error.message}`);
+  }
+
+  // Disable user di Auth (tidak menghapus, hanya disable)
+  const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+    user_metadata: { is_deleted: true },
+    app_metadata: { is_deleted: true }
+  });
+
+  if (authError) {
+    console.warn(`Peringatan: Gagal update metadata Auth: ${authError.message}`);
+  }
+
+  revalidatePath('/dashboard/users');
 }
 
 export async function updateUserRole(
