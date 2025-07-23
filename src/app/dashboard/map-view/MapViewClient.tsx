@@ -10,6 +10,7 @@ import Link from 'next/link';
 import MarkerClusterGroup from 'react-leaflet-markercluster';
 import { useEffect, useState } from 'react';
 
+// Fix for default markers in Next.js
 // @ts-ignore
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -38,16 +39,44 @@ interface RouteData {
   coordinates: [number, number][];
   distance: number;
   duration: number;
-  isRoutingApi: boolean; // Flag untuk menandai apakah menggunakan API atau garis lurus
+  isRoutingApi: boolean;
 }
 
-export function MapViewClient({ sites }: { sites: SiteForMap[] }) {
+// Props interface with corrected site_type field
+interface MapViewClientProps {
+  sites: Array<{
+    id: string;
+    name: string;
+    site_id: string | null;
+    site_type_name: string | null; // This matches the data structure
+    coordinates: string;
+  }>;
+}
+
+export function MapViewClient({ sites }: MapViewClientProps) {
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [showDirections, setShowDirections] = useState<boolean>(false);
   const [routes, setRoutes] = useState<RouteData[]>([]);
   const [loadingRoutes, setLoadingRoutes] = useState<boolean>(false);
   const [selectedSite, setSelectedSite] = useState<string | null>(null);
+
+  // Fungsi untuk mem-parsing koordinat "lat,long"
+  const parseCoords = (coords: string): [number, number] | null => {
+    if (!coords || typeof coords !== 'string') return null;
+    
+    const parts = coords.split(',').map(part => parseFloat(part.trim()));
+    if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+      return [parts[0], parts[1]];
+    }
+    return null;
+  };
+
+  // Process sites with coordinates
+  const validSites = sites.map(site => ({
+    ...site,
+    position: parseCoords(site.coordinates)
+  })).filter(site => site.position !== null);
 
   // Fungsi untuk mendapatkan lokasi pengguna
   useEffect(() => {
@@ -64,7 +93,7 @@ export function MapViewClient({ sites }: { sites: SiteForMap[] }) {
           let errorMessage = 'Tidak dapat mengakses lokasi';
           switch (error.code) {
             case error.PERMISSION_DENIED:
-              errorMessage = 'Izin lokasi ditolak';
+              errorMessage = 'Izin lokasi ditolak. Silakan aktifkan lokasi di browser Anda.';
               break;
             case error.POSITION_UNAVAILABLE:
               errorMessage = 'Informasi lokasi tidak tersedia';
@@ -77,8 +106,8 @@ export function MapViewClient({ sites }: { sites: SiteForMap[] }) {
         },
         {
           enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 60000
+          timeout: 15000,
+          maximumAge: 300000 // 5 minutes
         }
       );
     } else {
@@ -86,8 +115,20 @@ export function MapViewClient({ sites }: { sites: SiteForMap[] }) {
     }
   }, []);
 
+  // Fungsi untuk menghitung jarak lurus antara dua titik (Haversine formula)
+  const calculateStraightDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const R = 6371; // radius bumi dalam km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  };
+
   // Fungsi untuk mendapatkan rute menggunakan OSRM (Open Source Routing Machine)
-  const getRoute = async (start: [number, number], end: [number, number], siteId: string) => {
+  const getRoute = async (start: [number, number], end: [number, number], siteId: string): Promise<RouteData | null> => {
     try {
       // Menggunakan OSRM API (gratis, tidak perlu API key)
       const response = await fetch(
@@ -121,15 +162,15 @@ export function MapViewClient({ sites }: { sites: SiteForMap[] }) {
       
       return null;
     } catch (error) {
-      console.error('Error fetching route:', error);
+      console.error('Error fetching route for site', siteId, ':', error);
       
       // Fallback ke garis lurus jika API gagal
-      console.log('Falling back to straight line for site:', siteId);
+      const straightDistance = calculateStraightDistance(start[0], start[1], end[0], end[1]);
       return {
         siteId,
         coordinates: [start, end],
-        distance: calculateStraightDistance(start[0], start[1], end[0], end[1]),
-        duration: calculateStraightDistance(start[0], start[1], end[0], end[1]) * 2, // Estimasi 2 menit per km
+        distance: straightDistance,
+        duration: straightDistance * 2, // Estimasi 2 menit per km
         isRoutingApi: false
       };
     }
@@ -137,22 +178,27 @@ export function MapViewClient({ sites }: { sites: SiteForMap[] }) {
 
   // Fungsi untuk mendapatkan rute ke semua site atau site tertentu
   const fetchRoutes = async (targetSiteId?: string) => {
-    if (!userLocation) return;
+    if (!userLocation) {
+      console.warn('Cannot fetch routes: user location not available');
+      return;
+    }
     
     setLoadingRoutes(true);
     const targetSites = targetSiteId 
       ? validSites.filter(site => site.id === targetSiteId)
-      : validSites.slice(0, 5); // Batasi maksimal 5 site untuk performa
+      : validSites.slice(0, 10); // Batasi maksimal 10 site untuk performa
     
     try {
-      const routePromises = targetSites.map(site => 
-        site.position ? getRoute([userLocation.lat, userLocation.lng], site.position, site.id) : null
-      ).filter(Boolean);
+      const routePromises = targetSites
+        .filter(site => site.position !== null)
+        .map(site => getRoute([userLocation.lat, userLocation.lng], site.position!, site.id));
       
       const routeResults = await Promise.allSettled(routePromises);
       const validRoutes = routeResults
-        .filter(result => result.status === 'fulfilled' && result.value !== null)
-        .map(result => (result as PromiseFulfilledResult<RouteData>).value);
+        .filter((result): result is PromiseFulfilledResult<RouteData> => 
+          result.status === 'fulfilled' && result.value !== null
+        )
+        .map(result => result.value);
       
       if (targetSiteId) {
         setRoutes(prev => [...prev.filter(r => r.siteId !== targetSiteId), ...validRoutes]);
@@ -166,50 +212,14 @@ export function MapViewClient({ sites }: { sites: SiteForMap[] }) {
     }
   };
 
-  // Fungsi untuk mem-parsing koordinat "lat,long"
-  const parseCoords = (coords: string): [number, number] | null => {
-    const parts = coords.split(',').map(part => parseFloat(part.trim()));
-    if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
-      return [parts[0], parts[1]];
-    }
-    return null;
-  };
-
-  const validSites = sites.map(site => ({
-    ...site,
-    position: parseCoords(site.coordinates)
-  })).filter(site => site.position !== null);
-
-  if (sites.length === 0) {
-    return (
-      <div className="h-full w-full bg-gray-200 flex items-center justify-center">
-        <p>Tidak ada site dengan data koordinat untuk ditampilkan.</p>
-      </div>
-    );
-  }
-
-  // Tentukan pusat peta berdasarkan lokasi pengguna atau site pertama
-  const centerPosition = userLocation 
-    ? [userLocation.lat, userLocation.lng] as [number, number]
-    : validSites[0]?.position as [number, number] || [-6.914744, 107.609810];
-
-  // Fungsi untuk menghitung jarak lurus antara dua titik
-  const calculateStraightDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
-    const R = 6371; // radius bumi dalam km
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-      Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c;
-  };
-
   // Handle toggle directions
   const handleToggleDirections = async (checked: boolean) => {
     setShowDirections(checked);
     if (checked && userLocation && routes.length === 0) {
       await fetchRoutes();
+    } else if (!checked) {
+      setRoutes([]);
+      setSelectedSite(null);
     }
   };
 
@@ -226,10 +236,31 @@ export function MapViewClient({ sites }: { sites: SiteForMap[] }) {
     }
   };
 
+  // Early return if no valid sites
+  if (validSites.length === 0) {
+    return (
+      <div className="h-full w-full bg-gray-200 flex items-center justify-center">
+        <div className="text-center p-4">
+          <p className="text-lg text-gray-600">Tidak ada site dengan data koordinat yang valid untuk ditampilkan.</p>
+          <p className="text-sm text-gray-500 mt-2">Total sites: {sites.length}, Valid coordinates: 0</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Tentukan pusat peta berdasarkan lokasi pengguna atau site pertama
+  const centerPosition: [number, number] = userLocation 
+    ? [userLocation.lat, userLocation.lng]
+    : validSites[0]?.position || [-6.914744, 107.609810]; // Default to Bandung
+
   return (
     <div className="relative h-full w-full">
       {/* Control panel */}
       <div className="absolute top-4 right-4 z-[1000] bg-white rounded-lg shadow-lg p-3 space-y-2 max-w-xs">
+        <div className="text-xs text-gray-600 mb-2">
+          Sites: {validSites.length} dari {sites.length}
+        </div>
+        
         <div className="flex items-center space-x-2">
           <input
             type="checkbox"
@@ -242,10 +273,13 @@ export function MapViewClient({ sites }: { sites: SiteForMap[] }) {
           <label htmlFor="showDirections" className="text-sm font-medium">
             Tampilkan Rute Jalan
           </label>
-          {!userLocation && (
-            <span className="text-xs text-gray-500">(Butuh lokasi)</span>
-          )}
         </div>
+        
+        {!userLocation && !locationError && (
+          <div className="text-xs text-blue-600 bg-blue-50 p-2 rounded">
+            📍 Mendeteksi lokasi Anda...
+          </div>
+        )}
         
         {loadingRoutes && (
           <div className="text-xs text-blue-600 bg-blue-50 p-2 rounded flex items-center space-x-2">
@@ -256,21 +290,21 @@ export function MapViewClient({ sites }: { sites: SiteForMap[] }) {
         
         {locationError && (
           <div className="text-xs text-red-600 bg-red-50 p-2 rounded">
-            {locationError}
+            ❌ {locationError}
           </div>
         )}
         
         {userLocation && (
           <div className="text-xs text-green-600 bg-green-50 p-2 rounded">
-            ✓ Lokasi pengguna terdeteksi
+            ✅ Lokasi pengguna terdeteksi
           </div>
         )}
 
         {routes.length > 0 && (
           <div className="text-xs text-gray-600 bg-gray-50 p-2 rounded">
-            Menampilkan {routes.length} rute
+            📍 Menampilkan {routes.length} rute
             <div className="mt-1 text-xs text-gray-500">
-              💡 Tip: Jika rute tidak muncul, coba refresh atau periksa koneksi internet
+              💡 Klik marker site untuk rute individual
             </div>
           </div>
         )}
@@ -336,7 +370,7 @@ export function MapViewClient({ sites }: { sites: SiteForMap[] }) {
                   <div className="font-sans">
                     <h3 className="font-bold text-base mb-1">{site.name}</h3>
                     <p className="text-sm text-gray-600"><strong>ID:</strong> {site.site_id || 'N/A'}</p>
-                    <p className="text-sm text-gray-600"><strong>Tipe:</strong> {site.site_type}</p>
+                    <p className="text-sm text-gray-600"><strong>Tipe:</strong> {site.site_type_name || 'N/A'}</p>
                     <p className="text-sm text-gray-600">
                       <strong>Koordinat:</strong> {site.position[0].toFixed(6)}, {site.position[1].toFixed(6)}
                     </p>
@@ -363,7 +397,7 @@ export function MapViewClient({ sites }: { sites: SiteForMap[] }) {
                             </p>
                             {!siteRoute.isRoutingApi && (
                               <p className="text-xs text-orange-600 mt-1">
-                                ⚠️ Menggunakan jarak lurus (API routing gagal)
+                                ⚠️ Menggunakan jarak lurus (API routing tidak tersedia)
                               </p>
                             )}
                           </div>
@@ -371,7 +405,7 @@ export function MapViewClient({ sites }: { sites: SiteForMap[] }) {
                         
                         <button
                           onClick={() => handleSiteRoute(site.id)}
-                          className="mt-2 w-full bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700"
+                          className="mt-2 w-full bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 disabled:opacity-50"
                           disabled={!userLocation || loadingRoutes}
                         >
                           {selectedSite === site.id ? 'Sembunyikan Rute' : 'Tampilkan Rute'}

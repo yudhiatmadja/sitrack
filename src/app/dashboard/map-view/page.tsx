@@ -1,39 +1,70 @@
-// File: src/app/dashboard/map-view/page.tsx
 import { createClient } from "@/lib/supabase/server"
-import { getCurrentUserRole } from "@/lib/auth-helper"  
+import { getCurrentUserRole } from "@/lib/auth-helper"
 import { redirect } from "next/navigation"
-import { MapViewClient } from "./MapViewClient"
-import type { Database } from "@/types/supabase"
 import { MapLoader } from "./MapLoader"
 
-// Definisikan tipe Site dengan koordinat yang kita butuhkan
+// Definisikan SATU tipe yang jelas untuk data yang dibutuhkan oleh peta
 export type SiteForMap = {
   id: string;
   name: string;
-  site_id: string | null;
-  site_type: Database['public']['Enums']['site_type_enum'];
-  coordinates: string; // Kita akan pastikan ini tidak null
+  site_id: string | null; // Kita akan buat manual dari 'id'
+  site_type_name: string | null;
+  coordinates: string;
 }
 
+// Fungsi untuk mengambil data site dari server
 async function getSitesWithCoordinates(): Promise<SiteForMap[]> {
     const supabase = createClient();
+    
+    // Kita gunakan query yang mengembalikan site_types sebagai array
     const { data, error } = await supabase
         .from('sites')
-        .select('id, name, site_type, coordinates')
+        .select(`
+            id,
+            name,
+            coordinates,
+            site_types ( 
+                name 
+            )
+        `)
         .not('coordinates', 'is', null)
         .neq('coordinates', '');
 
     if (error) {
-        console.error("Error fetching sites for map:", error);
+        console.error("Server Error fetching sites for map:", error);
         return [];
     }
+    
+    if (!data) {
+        return [];
+    }
+    
+    // Transformasi data dengan aman
+    const formattedData: SiteForMap[] = data.map(site => {
+        // PERBAIKAN UTAMA ADA DI SINI:
+        // 1. Cek apakah site.site_types adalah array dan tidak kosong
+        // 2. Jika ya, ambil nama dari elemen pertama (site.site_types[0].name)
+        // 3. Jika tidak, kembalikan null
+        const siteTypeName = (site.site_types && Array.isArray(site.site_types) && site.site_types.length > 0)
+            ? site.site_types[0].name
+            : null;
 
-    return data.map(d => ({ ...d, site_id: d.id })) as SiteForMap[];
+        return {
+            id: site.id,
+            name: site.name || 'Site Tanpa Nama',
+            site_id: site.id,
+            site_type_name: siteTypeName, // Gunakan nama yang sudah diekstrak
+            coordinates: site.coordinates || '',
+        };
+    });
+
+    return formattedData;
 }
 
 export default async function MapViewPage() {
+    // ... (sisa kode halaman ini tidak perlu diubah, sudah benar) ...
     const userRole = await getCurrentUserRole();
-    const allowedRoles: (typeof userRole)[] = ['Optima', 'Asset', 'SuperAdmin'];
+    const allowedRoles = ['Optima', 'Asset', 'SuperAdmin'];
 
     if (!userRole || !allowedRoles.includes(userRole)) {
         return redirect('/dashboard?error=unauthorized');
@@ -45,10 +76,12 @@ export default async function MapViewPage() {
         <div>
             <div className="mb-6">
                 <h1 className="text-3xl font-bold text-gray-800">Tampilan Peta Site</h1>
-                <p className="text-gray-600">Visualisasi lokasi semua site yang terdaftar.</p>
+                <p className="text-gray-600">
+                    Visualisasi lokasi semua site yang terdaftar. 
+                    {sites.length > 0 && ` Menampilkan ${sites.length} site.`}
+                </p>
             </div>
             <div className="h-[75vh] w-full rounded-lg shadow-lg overflow-hidden border">
-                {/* Render komponen loader, bukan komponen peta secara langsung */}
                 <MapLoader sites={sites} />
             </div>
         </div>

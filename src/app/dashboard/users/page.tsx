@@ -129,7 +129,7 @@ async function UsersTable() {
                                                 currentUserId={currentUser?.id}
                                                 userEmail={user.email || undefined}
                                                 userName={user.full_name || undefined}
-                                                // useSoftDelete={true} // Uncomment jika ingin menggunakan soft delete
+                                                // useSoftDelete={true}
                                             />
                                         </div>
                                     </td>
