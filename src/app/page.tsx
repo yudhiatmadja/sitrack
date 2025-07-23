@@ -542,7 +542,7 @@ export default function LandingPage() {
                 <ul className="space-y-2 text-sm text-gray-600">
                   <li><a href="#features" className="hover:text-red-600 transition-colors duration-300">Fitur</a></li>
                   <li><a href="#benefits" className="hover:text-red-600 transition-colors duration-300">Manfaat</a></li>
-                  <li><a href="#" className="hover:text-red-600 transition-colors duration-300">Harga</a></li>
+                  
                 </ul>
               </div>
             </div>

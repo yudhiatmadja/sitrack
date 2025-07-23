@@ -23,12 +23,11 @@ export default async function NewSitePage() {
         return redirect('/dashboard/sites?error=unauthorized');
     }
   return (
-    <div className="p-4 sm:p-6 lg:p-8">
-      <div className="mx-auto max-w-xl">
-        <h1 className="text-2xl font-bold mb-6">Tambah Site Baru</h1>
-        <div className="p-6 bg-white rounded-lg shadow-md">
-          <SiteForm action={createSite} />
-        </div>
+    <div>
+      <h1 className="text-2xl font-bold mb-6">Tambah Site Baru</h1>
+      <div className="p-6 bg-white rounded-lg shadow-md">
+        {/* Panggil SiteForm tanpa props data */}
+        <SiteForm action={createSite} />
       </div>
     </div>
   )

@@ -2,7 +2,9 @@ import { type ProfileWithRole } from "@/app/dashboard/layout"
 import { LogoutButton } from "./LogoutButton"
 import { Menu, X } from "lucide-react"
 import Link from "next/link"
+import { usePathname } from 'next/navigation'
 import Image from "next/image"
+import { NotificationBell } from "./NotificationBell"
 
 export function Header({ 
   userProfile, 
@@ -14,6 +16,23 @@ export function Header({
   isSidebarOpen?: boolean
 }) {
   const initial = userProfile.full_name?.charAt(0).toUpperCase() || 'U';
+
+  const pathname = usePathname()
+
+function getCurrentPageName(path: string): string {
+  if (path === "/dashboard" || path === "/dashboard/") {
+    return "Home"
+  }
+
+  if (path.startsWith("/dashboard/master-data")) {
+    return "Master Data"
+  }
+
+  const parts = path.split('/').filter(Boolean)
+  const last = parts[parts.length - 1] || 'home'
+  return last.charAt(0).toUpperCase() + last.slice(1)
+}
+
 
   return (
     <header className="bg-white shadow-lg border-b-4 border-red-500 sticky top-0 z-40">
@@ -45,12 +64,14 @@ export function Header({
             <div className="flex items-center space-x-2 text-sm text-gray-600">
               <span>Dashboard</span>
               <span className="text-red-500">•</span>
-              <span>Home</span>
+              <span>{getCurrentPageName(pathname)}</span>
             </div>
           </div>
         </div>
 
         <div className="flex items-center gap-2 lg:gap-4">
+        <NotificationBell userId={userProfile.id} />
+
           {/* User info card - mobile & desktop */}
           <Link href="/dashboard/profile" className="block">
             <div className="bg-gradient-to-r from-red-50 to-white p-2 lg:p-3 rounded-lg border border-red-100 shadow-sm hover:shadow-md transition-shadow">

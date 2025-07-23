@@ -1,10 +1,10 @@
-// File: src/app/layout.tsx
-// TIDAK ADA 'use client'
+
 
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "sonner";
+import { Analytics } from '@vercel/analytics/next';
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -59,6 +59,7 @@ export default function RootLayout({
         <main className="min-h-screen bg-gray-50">
           {children}
         </main>
+        <Analytics />
         <Toaster richColors />
       </body>
     </html>

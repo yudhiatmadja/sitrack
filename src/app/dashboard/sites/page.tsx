@@ -44,14 +44,22 @@ export default async function SitesPage({
 
     // 1. Mulai membangun query
     let queryBuilder = supabase
-      .from('sites')
-      .select('*')
-      .order('created_at', { ascending: false });
+        .from('sites')
+        // PERBARUI SELECT DI SINI
+        .select(`
+            *,
+            regionals (name),
+            witels (name),
+            stos (name)
+        `)
+        .order('created_at', { ascending: false });
 
     // 2. Tambahkan filter pencarian jika ada
     if (query) {
       // Hanya cari berdasarkan nama
-      queryBuilder = queryBuilder.ilike('name', `%${query}%`);
+      // queryBuilder = queryBuilder.ilike('name', `%${query}%`);
+
+      queryBuilder = queryBuilder.or(`name.ilike.%${query}%,site_id.ilike.%${query}%`);
     }
 
     // 3. Eksekusi query yang sudah dibangun

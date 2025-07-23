@@ -20,9 +20,10 @@ export type State = {
 // 2. Definisikan Skema Zod yang BENAR dan LENGKAP
 const SiteSchema = z.object({
   name: z.string().min(3, { message: 'Nama site minimal 3 karakter.' }),
-  site_type: z.enum(['ODC', 'Mini OLT', 'Pole'], {
-    message: 'Tipe site harus dipilih.',
-  }),
+  site_type_id: z.coerce.number({ message: 'Tipe site harus dipilih.' }).positive(),
+  regional_id: z.coerce.number().optional().nullable(),
+  witel_id: z.coerce.number().optional().nullable(),
+  sto_id: z.coerce.number().optional().nullable(),
   address: z.string().optional(),
   coordinates: z.string().optional(),
 });

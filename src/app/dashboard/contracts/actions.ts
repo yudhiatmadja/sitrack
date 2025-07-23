@@ -245,3 +245,24 @@ export async function updateContract(id: string, prevState: State, formData: For
   revalidatePath(`/dashboard/contracts/${id}`);
   redirect('/dashboard/contracts');
 }
+
+export async function approveContract(id: string) {
+  const supabase = createClient();
+
+  // Update status kontrak menjadi 'Approved'
+  const { error: updateError } = await supabase
+    .from('contracts')
+    .update({
+      status: 'Approved',
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', id);
+
+  if (updateError) {
+    throw new Error(`Gagal menyetujui kontrak: ${updateError.message}`);
+  }
+
+  // Revalidate cache untuk update UI
+  revalidatePath('/dashboard/contracts');
+  revalidatePath(`/dashboard/contracts/${id}`);
+}

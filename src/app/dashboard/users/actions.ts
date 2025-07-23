@@ -159,3 +159,36 @@ export async function deleteUser(userId: string) {
     // Revalidate path untuk memperbarui UI
     revalidatePath('/dashboard/users');
 }
+
+export async function updateUserRole(
+  userId: string,
+  prevState: UserState,
+  formData: FormData
+): Promise<UserState> {
+  const role_id = formData.get('role_id') as string;
+
+  if (!role_id) {
+    return {
+      errors: { role_id: ['Peran harus dipilih.'] },
+      message: 'Input tidak valid.',
+    };
+  }
+
+  const supabaseAdmin = createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
+  const { error } = await supabaseAdmin
+    .from('users')
+    .update({ role_id })
+    .eq('id', userId);
+
+  if (error) {
+    console.error('[updateUserRole] Gagal update peran:', error.message);
+    return { message: `Gagal memperbarui peran: ${error.message}` };
+  }
+
+  revalidatePath('/dashboard/users');
+  return { message: 'Peran berhasil diperbarui.' };
+}

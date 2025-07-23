@@ -3,7 +3,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, Landmark, Users, FileText, Building, LogOut, BarChart3, User, Map, MapPin } from 'lucide-react'
+import { Home, Landmark, Users, FileText, Building, LogOut, BarChart3, User, Map, MapPin, Database } from 'lucide-react'
 import { type ProfileWithRole } from "@/app/dashboard/layout"
 import { useEffect, useState } from 'react'
 import { LogoutButton } from './LogoutButton'
@@ -29,6 +29,7 @@ const navItems: NavItem[] = [
   { href: '/dashboard/contracts', icon: FileText, label: 'Kontrak', allowedRoles: ['SuperAdmin', 'Legal'] },
   { href: '/dashboard/land-owners', icon: Map, label: 'Pemilik Lahan', allowedRoles: ['SuperAdmin'] },
   { href: '/dashboard/map-view', icon: MapPin, label: 'Tampilan Peta', allowedRoles: ['SuperAdmin', 'Optima', 'Asset'] },
+  { href: '/dashboard/master-data', icon: Database, label: 'Data Master', allowedRoles: ['SuperAdmin'] },
   { href: '/dashboard/users', icon: Users, label: 'Manajemen User', allowedRoles: ['SuperAdmin'] },
 ]
 

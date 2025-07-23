@@ -1,4 +1,3 @@
-// File: src/app/dashboard/contracts/page.tsx
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import { PlusCircle, FileText, Search, Filter, X } from "lucide-react";
@@ -124,6 +123,8 @@ export default async function ContractsPage({
   const canDelete = userRole === "SuperAdmin";
   const canDownload =
     userRole === "Asset" || userRole === "Legal" || userRole === "SuperAdmin";
+
+    const canApprove = userRole === "SuperAdmin" || userRole === "Legal";
 
   // Await searchParams before using its properties
   const resolvedSearchParams = await searchParams;
@@ -315,6 +316,7 @@ export default async function ContractsPage({
           canEdit={canEdit}
           canDelete={canDelete}
           canDownload={canDownload}
+          canApprove={canApprove}
         />
       )}
     </div>
